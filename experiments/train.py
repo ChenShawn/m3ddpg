@@ -9,6 +9,7 @@ import os
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import maddpg.common.tf_util as U
 from maddpg.trainer.maddpg import MADDPGAgentTrainer
@@ -32,11 +33,11 @@ def parse_args():
     parser.add_argument("--adv-eps-s", type=float, default=1e-5, help="small adversarial training rate")
     # Checkpointing
     parser.add_argument("--exp-name", type=str, default=None, help="name of the experiment")
-    parser.add_argument("--save-dir", type=str, default="/tmp/policy/", help="directory in which training state and model should be saved")
+    parser.add_argument("--save-dir", type=str, default="./policy/", help="directory in which training state and model should be saved")
     parser.add_argument("--save-rate", type=int, default=1000, help="save model once every time this many episodes are completed")
     parser.add_argument("--load-name", type=str, default="", help="name of which training state and model are loaded, leave blank to load seperately")
-    parser.add_argument("--load-good", type=str, default="", help="which good policy to load")
-    parser.add_argument("--load-bad", type=str, default="", help="which bad policy to load")
+    parser.add_argument("--load-good", type=str, default="./policy/model", help="which good policy to load")
+    parser.add_argument("--load-bad", type=str, default="./policy/model", help="which bad policy to load")
     # Evaluation
     parser.add_argument("--test", action="store_true", default=False)
     parser.add_argument("--restore", action="store_true", default=False)
@@ -226,6 +227,7 @@ def train(arglist):
                     pickle.dump(final_ep_ag_rewards, fp)
                 print('...Finished total of {} episodes.'.format(len(episode_rewards)))
                 break
+
 
 if __name__ == '__main__':
     arglist = parse_args()

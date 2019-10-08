@@ -223,6 +223,22 @@ def absolute_scope_name(relative_scope_name):
 # ================================================================
 
 
+def load_state_v2(model_path, saver=None):
+    print(" [*] Reading checkpoints...")
+    if saver is None:
+        saver = tf.train.Saver()
+    ckpt = tf.train.get_checkpoint_state(model_path)
+    if ckpt and ckpt.model_checkpoint_path:
+        ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+        saver.restore(get_session(), os.path.join(model_path, ckpt_name))
+        counter = int(next(re.finditer("(\d+)(?!.*\d)", ckpt_name)).group(0))
+        print(" [*] Success to read {}".format(ckpt_name))
+        return True, counter
+    else:
+        print(" [*] Failed to find a checkpoint")
+        return False, 0
+
+
 def load_state(fname, saver=None):
     """Load all the variables to the current session from the location <fname>"""
     if saver is None:
