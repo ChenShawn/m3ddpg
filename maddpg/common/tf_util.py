@@ -224,7 +224,9 @@ def absolute_scope_name(relative_scope_name):
 
 
 def load_state_v2(model_path, saver=None):
-    print(" [*] Reading checkpoints...")
+    """ my implementation, model_path could be a directory/folder """
+    import re
+    print(" [*] Reading checkpoints in {}...".format(model_path))
     if saver is None:
         saver = tf.train.Saver()
     ckpt = tf.train.get_checkpoint_state(model_path)
@@ -235,7 +237,7 @@ def load_state_v2(model_path, saver=None):
         print(" [*] Success to read {}".format(ckpt_name))
         return True, counter
     else:
-        print(" [*] Failed to find a checkpoint")
+        print(" [*] Failed to find a checkpoint in {}".format(model_path))
         return False, 0
 
 

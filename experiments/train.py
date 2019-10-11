@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import tensorflow as tf
+import tensorflow.contrib.slim as slim
 import time
 import pickle
 import sys
@@ -36,8 +37,8 @@ def parse_args():
     parser.add_argument("--save-dir", type=str, default="./policy/", help="directory in which training state and model should be saved")
     parser.add_argument("--save-rate", type=int, default=1000, help="save model once every time this many episodes are completed")
     parser.add_argument("--load-name", type=str, default="", help="name of which training state and model are loaded, leave blank to load seperately")
-    parser.add_argument("--load-good", type=str, default="./policy/model", help="which good policy to load")
-    parser.add_argument("--load-bad", type=str, default="./policy/model", help="which bad policy to load")
+    parser.add_argument("--load-good", type=str, default="./maddpg_vs_maddpg/", help="which good policy to load")
+    parser.add_argument("--load-bad", type=str, default="./maddpg_vs_maddpg/", help="which bad policy to load")
     # Evaluation
     parser.add_argument("--test", action="store_true", default=False)
     parser.add_argument("--restore", action="store_true", default=False)
@@ -114,16 +115,16 @@ def train(arglist):
                 for i in range(num_adversaries):
                     bad_var_list += tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=trainers[i].scope)
                 saver = tf.train.Saver(bad_var_list)
-                U.load_state(arglist.load_bad, saver)
+                U.load_state_v2(arglist.load_bad, saver)
 
                 good_var_list = []
                 for i in range(num_adversaries, env.n):
                     good_var_list += tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=trainers[i].scope)
                 saver = tf.train.Saver(good_var_list)
-                U.load_state(arglist.load_good, saver)
+                U.load_state_v2(arglist.load_good, saver)
             else:
                 print('Loading previous state from {}'.format(arglist.load_name))
-                U.load_state(arglist.load_name)
+                U.load_state_v2(arglist.load_name)
 
         episode_rewards = [0.0]  # sum of rewards for all agents
         agent_rewards = [[0.0] for _ in range(env.n)]  # individual agent reward
@@ -135,6 +136,12 @@ def train(arglist):
         episode_step = 0
         train_step = 0
         t_start = time.time()
+
+        # =======================================================
+        displayed_agent_rewards = [[] for _ in range(env.n)]
+        this_episode_total_reward = [0.0 for _ in range(env.n)]
+        slim.model_analyzer.analyze_vars(tf.trainable_variables(), print_info=True)
+        # =======================================================
 
         print('Starting iterations...')
         while True:
@@ -161,6 +168,14 @@ def train(arglist):
                 for a in agent_rewards:
                     a.append(0)
                 agent_info.append([[]])
+                for dlist, this_reward_val in zip(displayed_agent_rewards, this_episode_total_reward):
+                    dlist.append(this_reward_val)
+                if len(displayed_agent_rewards[0]) >= 100:
+                    displayed_array = np.array(displayed_agent_rewards, dtype=np.float32)
+                    mean_array = displayed_array.mean(axis=-1)
+                    np.save(os.path.join(arglist.benchmark_dir, '{}_vs_{}.npy'.format(arglist.good_policy, arglist.bad_policy)), mean_array)
+                    exit(0)
+                this_episode_total_reward = [0.0 for _ in range(env.n)]
 
             # increment global step counter
             train_step += 1
@@ -179,7 +194,9 @@ def train(arglist):
 
             # for displaying learned policies
             if arglist.display:
-                time.sleep(0.1)
+                #time.sleep(0.1)
+                for idx in range(len(this_episode_total_reward)):
+                    this_episode_total_reward[idx] += rew_n[idx]
                 env.render()
                 continue
 
