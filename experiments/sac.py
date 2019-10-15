@@ -14,7 +14,7 @@ def parse_args():
     parser.add_argument("--scenario", type=str, default="simple_tag", help="name of the scenario script")
     parser.add_argument("--max-episode-len", type=int, default=25, help="maximum episode length")
     parser.add_argument("--num-agents", type=int, default=4, help="number of agents")
-    parser.add_argument("--num-episodes", type=int, default=20000, help="number of episodes")
+    parser.add_argument("--num-episodes", type=int, default=60000, help="number of episodes")
     parser.add_argument("--buffer-size", type=int, default=20, help="size * batch_size = real_buffer_size")
     parser.add_argument("--write-summary-every", type=int, default=200, help="size * batch_size = real_buffer_size")
     # Core training parameters
@@ -113,13 +113,13 @@ def initialize_multi_replay_buffer(env, sess, buffers, agents, episode_len=50):
             global_action = [agent.choose_action(sess, s) for agent, s in zip(agents, global_s)]
             global_action_array = np.concatenate([np.expand_dims(a, axis=1) for a in global_action], axis=-1)
             global_s_next, global_reward, global_done, info = env.step(global_action)
+            done = any(global_done)
+            episode_len_cnt += 1
+            if done or episode_len_cnt > episode_len and not done:
+                break
             for bf, s, r, s_next in zip(buffers, global_s, global_reward, global_s_next):
                 bf.restore(s, global_action_array, r, s_next)
-            done = any(global_done)
-            if done:
-                break
             global_s = global_s_next
-            episode_len_cnt += 1
         pbar.update(episode_len_cnt)
     print(' [*] All agent buffer initialized')
     pbar.close()
@@ -332,12 +332,7 @@ if __name__ == '__main__':
         global_action = [agent.choose_action(sess, s) for agent, s in zip(global_agents, global_state)]
         global_action_array = np.concatenate([np.expand_dims(a, axis=1) for a in global_action], axis=-1)
         global_s_next, global_reward, global_done, info = env.step(global_action)
-        for bf, s, r, s_next in zip(global_buffers, global_state, global_reward, global_s_next):
-            bf.restore(s, global_action_array, r, s_next)
         done = any(global_done)
-        for idx, r in enumerate(global_reward):
-            total_reward[idx] += r
-
         if done or episode_counter > arglist.max_episode_len:
             global_state = env.reset()
             episode_counter = 0
@@ -345,6 +340,11 @@ if __name__ == '__main__':
                 rll.append(trr)
             total_reward = [0.0 for _ in range(env.n)]
             continue
+
+        for bf, s, r, s_next in zip(global_buffers, global_state, global_reward, global_s_next):
+            bf.restore(s, global_action_array, r, s_next)
+        for idx, r in enumerate(global_reward):
+            total_reward[idx] += r
 
         if not arglist.test:
             for idx, agent in enumerate(global_agents):
@@ -368,7 +368,7 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(reward_list[0], linewidth=1.5)
     plt.plot(reward_list[-1], linewidth=1.5)
-    plt.title('Total reward with episode length = {}'.fotmat(arglist.max_episode_len))
+    plt.title('Total reward with episode length = {}'.format(arglist.max_episode_len))
     plt.legend(['adversaries', 'good policy'], loc='best')
     plt.show()
 
